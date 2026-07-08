@@ -61,16 +61,54 @@ export default function App() {
     localStorage.setItem("aura-cart", JSON.stringify(items));
   };
 
-  // 1. API fetchers
+  // Robust default testimonials for offline/static fallback
+  const DEFAULT_REVIEWS: Review[] = [
+    {
+      id: "r1",
+      author: "Éléonore M.",
+      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=faces",
+      rating: 5,
+      date: "Il y a 2 jours",
+      productName: "Le Sablier de Chronos",
+      comment: "Cet objet a totalement transformé mon espace de travail. Le sable scintille d'une lueur bleutée apaisante qui me permet d'entrer instantanément en état d'hyperfocus. Absolument magique !"
+    },
+    {
+      id: "r2",
+      author: "Aurélien D.",
+      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=faces",
+      rating: 5,
+      date: "Il y a 5 jours",
+      productName: "Prisme de Solitude",
+      comment: "Les refractions chromatiques de ce prisme au coucher du soleil sont indescriptibles. Un investissement rentable pour mon bien-être mental."
+    },
+    {
+      id: "r3",
+      author: "Zarah V.",
+      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces",
+      rating: 4,
+      date: "Il y a 1 semaine",
+      productName: "Bougie d'Aura Stellaire",
+      comment: "L'odeur de cèdre et de poussière stellaire est incroyablement subtile et relaxante. Le fait qu'elle ait été coulée sur mesure selon mon signe astrologique apporte un vrai plus."
+    }
+  ];
+
+  // 1. API fetchers with local fallbacks
   const fetchOrders = async () => {
     try {
       const res = await fetch("/api/orders");
       const data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         setOrders(data.orders);
+        return;
       }
     } catch (err) {
-      console.error("Erreur de récupération des commandes", err);
+      console.warn("Serveur d'API non détecté. Bascule sur la persistance locale.");
+    }
+    const savedOrders = localStorage.getItem("aura-orders");
+    if (savedOrders) {
+      setOrders(JSON.parse(savedOrders));
+    } else {
+      setOrders([]);
     }
   };
 
@@ -78,11 +116,19 @@ export default function App() {
     try {
       const res = await fetch("/api/reviews");
       const data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         setReviews(data.reviews);
+        return;
       }
     } catch (err) {
-      console.error("Erreur de récupération des avis", err);
+      console.warn("Serveur d'API non détecté. Bascule sur les avis locaux.");
+    }
+    const savedReviews = localStorage.getItem("aura-reviews");
+    if (savedReviews) {
+      setReviews(JSON.parse(savedReviews));
+    } else {
+      localStorage.setItem("aura-reviews", JSON.stringify(DEFAULT_REVIEWS));
+      setReviews(DEFAULT_REVIEWS);
     }
   };
 
@@ -90,13 +136,41 @@ export default function App() {
     try {
       const res = await fetch("/api/analytics");
       const data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         setAnalytics(data.stats);
         setLiveFeed(data.liveFeed);
+        return;
       }
     } catch (err) {
-      console.error("Erreur de récupération des analytics", err);
+      console.warn("Serveur d'API non détecté. Calcul dynamique local.");
     }
+    const savedOrdersStr = localStorage.getItem("aura-orders");
+    const localOrders: Order[] = savedOrdersStr ? JSON.parse(savedOrdersStr) : [];
+    
+    const totalSales = localOrders.reduce((acc, o) => acc + o.total, 0) + 12540;
+    const ordersCount = localOrders.length + 84;
+    const averageBasket = Math.round(totalSales / ordersCount);
+
+    setAnalytics({
+      totalSales,
+      ordersCount,
+      averageBasket,
+      visitorCount: 1420 + localOrders.length * 5,
+      conversionRate: "5.8%",
+      activeUsers: Math.floor(Math.random() * 15) + 3
+    });
+
+    setLiveFeed([
+      { city: "Paris", item: "Le Sablier de Chronos", amount: 129, time: "Il y a 2 min" },
+      { city: "Genève", item: "Prisme de Solitude", amount: 149, time: "Il y a 8 min" },
+      { city: "Bruxelles", item: "Bougie d'Aura Stellaire", amount: 89, time: "Il y a 15 min" },
+      ...localOrders.map(o => ({
+        city: o.shippingAddress?.city || "Paris",
+        item: o.cartItems[0]?.product?.name || "Artéfact Personnalisé",
+        amount: o.total,
+        time: "À l'instant"
+      }))
+    ]);
   };
 
   // 2. Cart mutations
@@ -139,6 +213,15 @@ export default function App() {
     // Clear cart
     saveCart([]);
     setIsCheckoutOpen(false);
+
+    // Save order locally for immediate offline visual sync
+    const savedOrdersStr = localStorage.getItem("aura-orders");
+    const localOrders: Order[] = savedOrdersStr ? JSON.parse(savedOrdersStr) : [];
+    if (!localOrders.some(o => o.id === newOrder.id)) {
+      localOrders.push(newOrder);
+      localStorage.setItem("aura-orders", JSON.stringify(localOrders));
+    }
+
     // Refresh all streams
     fetchOrders();
     fetchAnalytics();
@@ -155,12 +238,33 @@ export default function App() {
         body: JSON.stringify({ orderId })
       });
       const data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         fetchOrders();
         fetchAnalytics();
+        return;
       }
     } catch (err) {
-      console.error(err);
+      console.warn("Simulation serveur indisponible, simulation locale.");
+    }
+    // Local simulation fallback
+    const savedOrdersStr = localStorage.getItem("aura-orders");
+    if (savedOrdersStr) {
+      const localOrders: Order[] = JSON.parse(savedOrdersStr);
+      const order = localOrders.find(o => o.id === orderId);
+      if (order) {
+        if (order.step < 4) {
+          order.step += 1;
+          order.steps[order.step - 1].done = true;
+          if (order.step === 4) {
+            order.status = "Livré en orbite";
+          } else {
+            order.status = order.steps[order.step - 1].name;
+          }
+          localStorage.setItem("aura-orders", JSON.stringify(localOrders));
+          setOrders(localOrders);
+          fetchAnalytics();
+        }
+      }
     }
   };
 
@@ -173,12 +277,28 @@ export default function App() {
         body: JSON.stringify(reviewData)
       });
       const data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         fetchReviews();
+        return;
       }
     } catch (err) {
-      console.error(err);
+      console.warn("Dépôt d'avis serveur en panne, enregistrement local.");
     }
+    // Local review submission fallback
+    const savedReviewsStr = localStorage.getItem("aura-reviews");
+    const localReviews: Review[] = savedReviewsStr ? JSON.parse(savedReviewsStr) : [...DEFAULT_REVIEWS];
+    const newReview: Review = {
+      id: "r-local-" + Date.now(),
+      author: reviewData.author,
+      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=faces",
+      rating: reviewData.rating,
+      date: "À l'instant",
+      productName: reviewData.productName || "Artéfact Céleste",
+      comment: reviewData.comment
+    };
+    localReviews.unshift(newReview);
+    localStorage.setItem("aura-reviews", JSON.stringify(localReviews));
+    setReviews(localReviews);
   };
 
   // Filtered Products helper

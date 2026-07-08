@@ -89,7 +89,7 @@ export default function AICustomizer({ onAddToCart, setCurrentTab }: AICustomize
       // Wait for loading simulation to finalize smoothly
       await loadingPromise;
 
-      if (data.success && data.artifact) {
+      if (data && data.success && data.artifact) {
         // Build product structure from generated details
         const art = data.artifact;
         const mappedProduct: Product = {
@@ -108,9 +108,67 @@ export default function AICustomizer({ onAddToCart, setCurrentTab }: AICustomize
         setStep(5); // Completion step
       }
     } catch (err) {
-      console.error(err);
-      // Fallback handled gracefully in API, but if network error:
-      setStep(1);
+      console.warn("Serveur d'alchimie indisponible, activation de la forge locale.");
+      await loadingPromise;
+
+      const zodiac = selectedZodiac;
+      const emotion = selectedEmotion;
+      const light = selectedLight;
+      const intent = intention || "Alignement global de l'esprit";
+
+      // Select dynamic fallback properties
+      const fallbacks: Record<string, any> = {
+        "hourglass": {
+          name: `Le Sablier Éthéré de ${zodiac}`,
+          tagline: "Maîtrisez les courants du temps et de l'esprit.",
+          description: `Façonné spécifiquement pour le signe ${zodiac}, ce sablier renferme un sable imprégné de l'énergie lumineuse ${light}. Conçu pour calmer l'émotion ${emotion}, il permet de concrétiser votre intention de : ${intent}.`,
+          components: ["Sable de quartz cristallisé", "Larmes de comète d'or", "Cadre en laiton brossé de Neptune"],
+          price: 129,
+          imageUrl: "hourglass",
+          primaryColor: light.includes("Aura") ? "#8B5CF6" : light.includes("Solaire") ? "#F59E0B" : "#10B981",
+          energyIndex: "96%"
+        },
+        "crystal": {
+          name: `Le Cristal de Résonance ${zodiac}`,
+          tagline: "Amplifiez votre harmonie intérieure céleste.",
+          description: `Un prisme d'obsidienne et de quartz pur accordé aux fréquences vibratoires de ${zodiac}. Sa réfraction sous le spectre ${light} dissipe les tensions liées à l'état ${emotion} pour libérer la puissance de votre vœu : ${intent}.`,
+          components: ["Obsidienne noire polie", "Poussière d'étoile de Sirius", "Noyau de cuivre supraconducteur"],
+          price: 149,
+          imageUrl: "crystal",
+          primaryColor: light.includes("Aura") ? "#EC4899" : light.includes("Solaire") ? "#EF4444" : "#6366F1",
+          energyIndex: "98%"
+        },
+        "candle": {
+          name: `La Bougie Astrale d'Intention`,
+          tagline: "Brûlez vos doutes sous la lueur des astres.",
+          description: `Coulée à la main lors de la pleine lune pour le signe ${zodiac}, cette cire de soja intègre des huiles essentielles rares choisies pour équilibrer l'émotion ${emotion}. Elle diffuse un halo de lumière ${light} parfait pour focaliser sur : ${intent}.`,
+          components: ["Cire de soja bio infusée", "Mèche en bois crépitant", "Éclats d'améthyste véritable"],
+          price: 89,
+          imageUrl: "candle",
+          primaryColor: light.includes("Aura") ? "#A78BFA" : light.includes("Solaire") ? "#FBBF24" : "#34D399",
+          energyIndex: "92%"
+        }
+      };
+
+      const keys = Object.keys(fallbacks);
+      const randomKey = keys[Math.floor(Math.random() * keys.length)];
+      const art = fallbacks[randomKey];
+
+      const mappedProduct: Product = {
+        id: "custom-local-" + Date.now(),
+        name: art.name,
+        tagline: art.tagline,
+        description: art.description,
+        price: art.price,
+        category: "Energy",
+        imageUrl: art.imageUrl,
+        energyIndex: art.energyIndex,
+        components: art.components,
+        primaryColor: art.primaryColor
+      };
+
+      setGeneratedArtifact(mappedProduct);
+      setStep(5); // Completion step
     } finally {
       setIsGenerating(false);
     }
