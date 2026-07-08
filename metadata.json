@@ -1,0 +1,6 @@
+{
+  "name": "L'Atelier Cosmique",
+  "description": "Une boutique e-commerce immersive d'artéfacts sensoriels et d'objets célestes uniques, personnalisés par l'IA pour harmoniser votre quotidien.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
